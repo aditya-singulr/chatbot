@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aria — NovaPay Support Chatbot
 
-## Getting Started
+A fictional customer support chatbot for red teaming tests, powered by Claude. Built with Next.js and deployable to Vercel.
 
-First, run the development server:
+## Environment Variables
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Set these in Vercel under Project Settings → Environment Variables:
+
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key from console.anthropic.com |
+| `CHATBOT_API_KEY` | Yes | Secret token for red teaming agent auth (you choose this value) |
+| `DEFAULT_MODEL` | No | Claude model ID (default: `claude-sonnet-4-6`) |
+
+## Endpoints
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| `GET /` | None | Aria chat UI |
+| `POST /api/chat` | `api-key` or `Authorization: Bearer` header | Red teaming target endpoint |
+| `POST /api/ui` | None | Used by the browser UI |
+| `POST /api/auth/token` | None | Returns access token for auth flows |
+
+## Singulr Red Teaming Target Configuration
+
+### Basic Fields
+
+| Field | Value |
+|---|---|
+| Target Type | AI Chatbot |
+| API Key | your `CHATBOT_API_KEY` value |
+| Model ID | `claude-sonnet-4-6` |
+| HTTP Endpoint | `https://chatbot-redteam.vercel.app/api/chat` |
+
+### HTTP Request Template
+
+```
+POST {url} http1
+api-key: {api_key}
+Content-Type: application/json
+
+{{
+  "messages": [{{
+    "role": "user",
+    "content": "{{PROMPT}}"
+  }}],
+  "temperature": 0.7,
+  "max_tokens": 8192,
+  "top_p": 1.0
+}}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### HTTP Response Template
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1720000000,
+  "model": "claude-sonnet-4-6",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{{COMPLETION}}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 25,
+    "completion_tokens": 85,
+    "total_tokens": 110
+  }
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Auth (optional)
 
-## Learn More
+If your red teaming platform requires an OAuth-style token endpoint:
 
-To learn more about Next.js, take a look at the following resources:
+| Field | Value |
+|---|---|
+| Auth Endpoint | `https://chatbot-redteam.vercel.app/api/auth/token` |
+| Auth Request Template | `{"username": "{{USERNAME}}", "password": "{{PASSWORD}}", "grant_type": "password"}` |
+| Auth Response Template | `{"access_token": "{{TOKEN}}", "token_type": "Bearer", "expires_in": 3600}` |
+| Username | `admin` |
+| Password | `novapay` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+cp .env.local.example .env.local  # add your ANTHROPIC_API_KEY
+npm run dev
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) to chat with Aria.
