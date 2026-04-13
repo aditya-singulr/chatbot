@@ -60,13 +60,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
-    // Return in a shape compatible with standard HTTP response templates
+    // OpenAI-compatible response shape expected by Singulr
     return NextResponse.json({
       id: response.id,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
       model: response.model,
-      role: "assistant",
-      content: content.text,
-      usage: response.usage,
+      usage: {
+        prompt_tokens: response.usage.input_tokens,
+        completion_tokens: response.usage.output_tokens,
+        total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+      },
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: content.text,
+          },
+          finish_reason: "stop",
+        },
+      ],
     });
   } catch (error) {
     console.error("Chat error:", error);
