@@ -2,15 +2,33 @@
 
 import { useState, useRef, useEffect } from "react";
 
+type Security = {
+  category: string;
+  confidence: string;
+  reason: string;
+  total_attacks: number;
+};
+
 type Message = {
   role: "user" | "assistant";
   content: string;
+  security?: Security | null;
+};
+
+const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
+  prompt_injection:   { label: "Prompt Injection",    color: "bg-red-100 text-red-700 border-red-200" },
+  jailbreak:          { label: "Jailbreak Attempt",   color: "bg-orange-100 text-orange-700 border-orange-200" },
+  social_engineering: { label: "Social Engineering",  color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  competitor_probe:   { label: "Competitor Probe",    color: "bg-blue-100 text-blue-700 border-blue-200" },
+  system_probe:       { label: "System Probe",        color: "bg-purple-100 text-purple-700 border-purple-200" },
+  roleplay_attack:    { label: "Roleplay Attack",     color: "bg-pink-100 text-pink-700 border-pink-200" },
 };
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [totalAttacks, setTotalAttacks] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,12 +49,20 @@ export default function Home() {
       const res = await fetch("/api/ui", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages.map(({ role, content }) => ({ role, content })) }),
       });
       const data = await res.json();
-      setMessages([...newMessages, { role: "assistant", content: data.message }]);
+
+      if (data.security?.total_attacks !== undefined) {
+        setTotalAttacks(data.security.total_attacks);
+      }
+
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: data.message, security: data.security },
+      ]);
     } catch {
-      setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+      setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong. Please try again.", security: null }]);
     } finally {
       setLoading(false);
     }
@@ -45,17 +71,25 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
-        <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-          N
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+            N
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">NovaPay Support</p>
+            <p className="text-xs text-green-500 font-medium flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              Aria is online
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">NovaPay Support</p>
-          <p className="text-xs text-green-500 font-medium flex items-center gap-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            Aria is online
-          </p>
-        </div>
+        {totalAttacks > 0 && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-full px-3 py-1">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span className="text-xs font-medium text-red-700">{totalAttacks} attack{totalAttacks !== 1 ? "s" : ""} detected</span>
+          </div>
+        )}
       </header>
 
       {/* Messages */}
@@ -73,22 +107,36 @@ export default function Home() {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={"flex " + (msg.role === "user" ? "justify-end" : "justify-start")}>
-            {msg.role === "assistant" && (
-              <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold mr-2 mt-1 shrink-0">
-                A
+          <div key={i} className={"flex flex-col " + (msg.role === "user" ? "items-end" : "items-start")}>
+            {/* Security badge on user messages */}
+            {msg.role === "user" && msg.security && msg.security.category !== "safe" && (
+              <div className={`mb-1 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${CATEGORY_LABELS[msg.security.category]?.color ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                <span>⚠</span>
+                <span>{CATEGORY_LABELS[msg.security.category]?.label ?? msg.security.category}</span>
+                <span className="opacity-60">· {msg.security.confidence} confidence</span>
               </div>
             )}
-            <div
-              className={
-                "max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap " +
-                (msg.role === "user"
-                  ? "bg-indigo-600 text-white rounded-br-sm"
-                  : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm")
-              }
-            >
-              {msg.content}
+            <div className={"flex " + (msg.role === "user" ? "justify-end" : "justify-start") + " w-full"}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold mr-2 mt-1 shrink-0">
+                  A
+                </div>
+              )}
+              <div
+                className={
+                  "max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap " +
+                  (msg.role === "user"
+                    ? "bg-indigo-600 text-white rounded-br-sm"
+                    : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm")
+                }
+              >
+                {msg.content}
+              </div>
             </div>
+            {/* Reason tooltip for flagged messages */}
+            {msg.role === "user" && msg.security && msg.security.category !== "safe" && (
+              <p className="text-xs text-gray-400 mt-1 max-w-[75%] text-right">{msg.security.reason}</p>
+            )}
           </div>
         ))}
 
