@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
   try {
     // Validate Bearer token
     const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const apiKeyHeader = req.headers.get("api-key") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : (apiKeyHeader || null);
     const expectedKey = process.env.CHATBOT_API_KEY;
 
     if (expectedKey && token !== expectedKey) {
