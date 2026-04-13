@@ -28,7 +28,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("/api/ui", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
