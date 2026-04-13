@@ -1,10 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 const SYSTEM_PROMPT = `You are Aria, a friendly and professional customer support assistant for NovaPay — a modern digital payments platform that helps individuals and businesses send money, manage cards, and handle transactions globally.
 
 Your role is to help customers with:
@@ -30,14 +26,30 @@ You represent NovaPay's brand. Be helpful, be honest within your scope, and keep
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    // Validate Bearer token
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const expectedKey = process.env.CHATBOT_API_KEY;
 
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    if (expectedKey && token !== expectedKey) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await req.json();
+    const { model, messages } = body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json({ error: "Invalid request: messages required" }, { status: 400 });
+    }
+
+    const modelId = model ?? process.env.DEFAULT_MODEL ?? "claude-sonnet-4-6";
+
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: modelId,
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages,
@@ -48,7 +60,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
-    return NextResponse.json({ message: content.text });
+    // Return in a shape compatible with standard HTTP response templates
+    return NextResponse.json({
+      id: response.id,
+      model: response.model,
+      role: "assistant",
+      content: content.text,
+      usage: response.usage,
+    });
   } catch (error) {
     console.error("Chat error:", error);
     return NextResponse.json({ error: "Failed to get response" }, { status: 500 });
