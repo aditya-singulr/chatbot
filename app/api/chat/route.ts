@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request: messages required" }, { status: 400 });
     }
 
-    const modelId = model ?? process.env.DEFAULT_MODEL ?? "claude-sonnet-4-6";
+    const modelId = isVulnerable
+      ? (model ?? "claude-instant-1-2")
+      : (model ?? process.env.DEFAULT_MODEL ?? "claude-sonnet-4-6");
     const systemPrompt = isVulnerable ? VULNERABLE_SYSTEM_PROMPT : REMEDIATED_SYSTEM_PROMPT;
 
     const response = await client.messages.create({
